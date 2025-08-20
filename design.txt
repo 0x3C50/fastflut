@@ -1,0 +1,4 @@
+with 8 cores:
+
+- 4 epoll threads managing connections, dispatching uring calls
+- 4 uring threads watching for read and write events and managing game state
