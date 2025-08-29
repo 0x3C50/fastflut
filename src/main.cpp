@@ -24,17 +24,25 @@
 
 static std::shared_ptr<global_state> global_state_ptr = std::make_shared<global_state>();
 
+extern "C" uint32_t* get_gstate() {
+	return global_state_ptr->canvas.data();
+}
+
 int main() {
 	spdlog::set_level(spdlog::level::trace);
 	spdlog::info("Starting fastflut version " VERSION);
 	int ncpu = get_nprocs_conf();
 	if (ncpu <= 0) ncpu = 1;
 	// int ncpu = 4;
+	// if (ncpu > 2) ncpu -= 4;
+	if (ncpu % 2 != 0) ncpu--;
+	int count_worker = ncpu / 2;
 	spdlog::info("Core distribution:");
 	spdlog::info(" TOT: {}", ncpu);
-	spdlog::info("   All cores assigned to socket IO");
-	std::vector<pthread_t> thread_list(ncpu);
-	std::vector<shard_state_t> shart_list(ncpu);
+	spdlog::info(" n uring: {}", ncpu / 2);
+	spdlog::info(" n uring worker: {}", ncpu / 2);
+	std::vector<pthread_t> thread_list(count_worker);
+	std::vector<shard_state_t> shart_list(count_worker);
 
 	__sighandler_t signal_handler = [](int) {
 		global_state_ptr->run = false;
@@ -43,9 +51,9 @@ int main() {
 	signal(SIGTERM, signal_handler);
 
 
-	for (int i = 0; i < ncpu; i++) {
+	for (int i = 0; i < count_worker; i++) {
 		shart_list[i].f_global_state = global_state_ptr;
-		shart_list[i].core_index = i;
+		shart_list[i].core_index = i * 2;
 		const int rc = pthread_create(&thread_list[i], nullptr, epoll_shard_main, &shart_list[i]);
 		if (rc != 0) {
 			perror("pthread_create");

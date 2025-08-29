@@ -6,37 +6,46 @@
 #include <array>
 #include <sys/socket.h>
 
+#include "liburing.h"
+
+constexpr size_t n_buffers = 2048;
+constexpr size_t buffer_size = 512;
+constexpr size_t data_buffer_size = 4096;
+
 struct connection_t {
 	int fd{};
+	int mapped_fd_index{};
 	// sockaddr_storage remote_addr{};
 	// socklen_t ra_len{};
-	std::array<char, 4096 * 4> read_buffer{};
-	size_t rb_write=0;
-	size_t rb_read=0;
+	std::vector<char> uring_buffer_region{};
+	std::vector<char> data_cache{};
+	size_t cache_len{};
+	// size_t rb_read=0;
 
-	char* get_current_ptr_and_advance(size_t len);
-	void skip_ahead_to(char delim);
-	bool find_where(char delim, size_t& out) const;
+	connection_t();
+	~connection_t() = default;
+
+	void register_uring_buffers(io_uring *uring);
+	void unregister_uring_buffers(io_uring *uring) const;
 };
 
-inline char * connection_t::get_current_ptr_and_advance(size_t len) {
-	char* the_addr = &read_buffer[rb_read];
-	rb_read += len;
-	return the_addr;
+inline connection_t::connection_t() {
+	data_cache.resize(data_buffer_size);
+	uring_buffer_region.resize(n_buffers * buffer_size);
+	//
+	// for (char* &uring_buffer : uring_buffers) {
+	// 	uring_buffer = new char[512];
+	// }
 }
 
-inline void connection_t::skip_ahead_to(char delim) {
-	while (rb_read < rb_write && read_buffer[rb_read] != delim) rb_read++;
-	// we're either out of room or at the delim
-	if (rb_read < rb_write) rb_read++; // skip over it if we have the space
+inline void connection_t::register_uring_buffers(io_uring *uring) {
+	io_uring_sqe *sqe = io_uring_get_sqe(uring);
+	io_uring_prep_provide_buffers(sqe, this->uring_buffer_region.data(), buffer_size, n_buffers, this->fd, 0);
+	io_uring_sqe_set_data64(sqe, 1);
 }
 
-inline bool connection_t::find_where(char delim, size_t& out) const {
-	size_t current_read = rb_read;
-	while (current_read < rb_write && read_buffer[current_read] != delim) current_read++;
-	// have we ran out of room? if yes return false
-	if (current_read == rb_write) return false;
-	// otherwise we are at the point of the delim
-	out = current_read;
-	return true;
+inline void connection_t::unregister_uring_buffers(io_uring *uring) const {
+	io_uring_sqe *sqe = io_uring_get_sqe(uring);
+	io_uring_prep_remove_buffers(sqe, n_buffers, this->fd);
+	io_uring_sqe_set_data64(sqe, 1);
 }
