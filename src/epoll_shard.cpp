@@ -111,7 +111,7 @@ bool handle_px_cmd(shard_state_t* shart, connection_t * conn, px_buffer& buffer)
 
 	{
 		// apply the pixel
-		shart->f_global_state->canvas[board_index] = color;
+		shart->f_global_state->canvas[board_index] = ntohl(color);
 	}
 
 	// SPDLOG_TRACE("PX {} {} {}", x_coordinate, y_coordinate, color);

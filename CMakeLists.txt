@@ -15,13 +15,21 @@ add_executable(fastflut src/main.cpp
         src/parser.cpp
         src/parser.h)
 
-target_link_libraries(fastflut PRIVATE spdlog::spdlog ${CMAKE_CURRENT_LIST_DIR}/lib/liburing/src/liburing.a)
+include(FetchContent)
+FetchContent_Declare(SFML
+        GIT_REPOSITORY https://github.com/SFML/SFML.git
+        GIT_TAG 3.0.1
+        GIT_SHALLOW ON
+        EXCLUDE_FROM_ALL
+        SYSTEM)
+FetchContent_MakeAvailable(SFML)
+
+target_link_libraries(fastflut PRIVATE spdlog::spdlog ${CMAKE_CURRENT_LIST_DIR}/lib/liburing/src/liburing.a SFML::Graphics)
 target_include_directories(fastflut PRIVATE lib/liburing/src/include)
 target_compile_definitions(fastflut PRIVATE VERSION="abcd" SPDLOG_ACTIVE_LEVEL=0)
 
 
 add_executable(fastflut_bench bench/main.cpp)
-
 
 set(BENCHMARK_ENABLE_TESTING OFF)
 add_subdirectory(lib/benchmark)
